@@ -1,14 +1,20 @@
 package josefx.fdthumbs;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.metadata.IIOMetadata;
 import javax.imageio.stream.ImageInputStream;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -27,14 +33,22 @@ class ThumbsUpdater extends SwingWorker<Void, ThumbData> {
     protected Void doInBackground() throws Exception {
         final File tfolder = new File(System.getProperty("user.home") + File.separator + ".thumbnails");
         if (!tfolder.exists() || !tfolder.isDirectory()) {
-            assert false;
+            //TODO move error to swing gui, do something else here
+            SwingUtilities.invokeLater(new Runnable() {
+
+                @Override
+                public void run() {
+                   JOptionPane.showMessageDialog(null,
+                           "No thumbnail directory found in "+tfolder.getAbsolutePath(),
+                           "Could not load thumbnails", JOptionPane.ERROR_MESSAGE);
+                }
+            }); 
             return null;
         }
-        final List<File> files = new ArrayList<File>();
-        readFileLists(tfolder, files);
+        final List<File> files = readFileLists(new File(tfolder.getAbsolutePath()+File.separator+"normal"));
         for (File f : files) {
-            ImageInputStream iis = ImageIO.createImageInputStream(f);
-            Iterator<ImageReader> reads = ImageIO.getImageReaders(iis);
+            final ImageInputStream iis = ImageIO.createImageInputStream(f);
+            final Iterator<ImageReader> reads = ImageIO.getImageReaders(iis);
             if (!reads.hasNext()) {
                 iis.close();
                 continue;
@@ -47,10 +61,12 @@ class ThumbsUpdater extends SwingWorker<Void, ThumbData> {
                 }
             }
             if (r == null) {
+                iis.close();
                 continue;
             }
             r.setInput(iis);
             final IIOMetadata meta = r.getImageMetadata(0);
+            r.dispose();
             iis.close();
             if (meta == null) {
                 continue;
@@ -58,9 +74,15 @@ class ThumbsUpdater extends SwingWorker<Void, ThumbData> {
             String uri = grabUri(meta);
             uri = uri != null ? uri : "";
             final ThumbData td = new ThumbData();
-            final File fff = new File(new URI(uri));
-            td.setOriginal(fff.getAbsolutePath());
-            td.setThumb(f.getAbsolutePath());
+            try{
+            
+                final File fff = new File(new URI(uri));
+                td.setOriginal(fff.getAbsolutePath());
+                td.setThumb(f.getAbsolutePath());
+            }catch(Exception ex){
+                td.setOriginal("Invalid Pathdata: "+uri);
+                td.setThumb(f.getAbsolutePath());
+            }
             this.publish(td);
         }
         return null;
@@ -88,14 +110,15 @@ class ThumbsUpdater extends SwingWorker<Void, ThumbData> {
         return uri;
     }
 
-    private void readFileLists(File f, List<File> l) {
-        for (File ff : f.listFiles()) {
-            if (ff.isFile()) {
-                l.add(ff);
-            } else if (ff.isDirectory()) {
-                readFileLists(ff, l);
+    private List<File> readFileLists(File f) {
+        
+        return Arrays.asList(f.listFiles(new FileFilter() {
+
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.isFile();
             }
-        }
+        }));
     }
 
     @Override

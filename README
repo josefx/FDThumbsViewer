@@ -1,0 +1,11 @@
+Requirements
+============
+Runtime: jre 1.6 or higher
+Development: Netbeans for GUI forms
+
+Description
+============
+The thumbnail viewer is based on the freedesktop.org specification for 
+thumbnail storage and generation. It lists existing thumbnails with
+metadata (currently original file) and can be used to delete them.
+ 
